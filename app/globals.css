@@ -1,0 +1,501 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ocre: #C8752A;
+  --color-terre: #A0412D;
+  --color-indigo: #23395B;
+  --color-or: #E3A63B;
+  --color-ebene: #2B1A10;
+  --color-sable: #F5ECDF;
+  --color-creme: #FCFAF6;
+  --color-taupe: #6B5444;
+  --color-ligne: #E6D7C3;
+}
+
+@theme inline {
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-bricolage);
+}
+
+.motif {
+  height: 14px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #C8752A 0 24px, #2B1A10 24px 32px, #E3A63B 32px 48px,
+    #2B1A10 48px 56px, #A0412D 56px 80px, #23395B 80px 88px
+  );
+}
+
+.hachure {
+  background-color: #E9D9C2;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(43, 26, 16, 0.06) 0 10px,
+    transparent 10px 20px
+  );
+}
+
+/* Fondu utilisé quand on change d'image dans la galerie de la fiche œuvre. */
+@keyframes fondu {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MOTION DESIGN — BANDEAU D'ACCUEIL
+   Les éléments du bandeau d'accueil sont cachés au départ, puis GSAP
+   les fait apparaître. Sécurité : si le JavaScript n'arrive pas,
+   ils réapparaissent tout seuls au bout de 2,5 secondes
+   (assez court pour ne pas laisser l'écran vide sur une connexion lente).
+   (Rien n'est caché si l'utilisateur a demandé « moins d'animations ».)
+   ───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  [data-hero] {
+    opacity: 0;
+    animation: secours-visible 0s 2.5s forwards;
+  }
+}
+@keyframes secours-visible {
+  to { opacity: 1; visibility: visible; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MICRO-INTERACTIONS
+   Ces règles sont volontairement HORS des couches Tailwind :
+   elles passent donc avant les classes transition-colors, etc.
+   ───────────────────────────────────────────────────────────── */
+
+/* Courbes maison (les mêmes que dans lib/motion.ts). */
+:root {
+  --courbe-snap: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --courbe-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 1. Boutons et boutons-pilules : ils s'enfoncent légèrement sous le doigt
+      ou la souris (dès l'appui), puis reviennent en douceur. */
+:where(button:not(:disabled), a[class*="rounded-full"]) {
+  transition-property: color, background-color, border-color, scale;
+  transition-duration: 160ms;
+  transition-timing-function: var(--courbe-snap);
+  -webkit-tap-highlight-color: transparent; /* pas de flash gris sur iPhone */
+}
+:where(button:not(:disabled), a[class*="rounded-full"]):active {
+  scale: 0.97;
+}
+
+/* 2. Cartes (data-carte) : toute la carte s'enfonce un peu sous le doigt,
+      et l'image zoome au survol (ordinateur seulement).
+      Zoom lent en entrant (on regarde l'œuvre), retour rapide en sortant. */
+[data-carte] {
+  transition: scale 160ms var(--courbe-snap);
+  -webkit-tap-highlight-color: transparent;
+}
+[data-carte]:active {
+  scale: 0.98;
+}
+[data-carte] img {
+  transition: scale 300ms var(--courbe-out); /* sortie du survol : rapide */
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-carte]:hover img {
+    scale: 1.05;
+    transition-duration: 700ms; /* entrée du survol : lente, contemplative */
+  }
+}
+
+/* 3. « Moins d'animations » demandé : on coupe ces effets. */
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a[class*="rounded-full"]):active,
+  [data-carte]:active,
+  [data-carte]:hover img {
+    scale: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TRANSITIONS DE PAGE
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --vt-sortie: 180ms;
+  --vt-entree: 2000ms;
+}
+
+/* 1. Le contenu de chaque nouvelle page arrive en montant.
+      Sauf sur l'accueil (:has([data-hero])) : son bandeau a déjà
+      sa propre chorégraphie, on n'empile pas deux mouvements. */
+@media (prefers-reduced-motion: no-preference) {
+  main#contenu:not(:has([data-hero])) {
+    animation: page-entre var(--vt-entree) cubic-bezier(0.3, 0.7, 0.2, 1) backwards;
+  }
+}
+@keyframes page-entre {
+  from { opacity: 0; translate: 0 64px; }
+}
+
+/* 2. Pendant un « voyage » de vignette, l'ancienne page s'efface
+      vite vers le haut (sortie courte, courbe qui démarre tout de suite). */
+::view-transition-old(root) {
+  animation: var(--vt-sortie) var(--courbe-out) both page-sort;
+}
+@keyframes page-sort {
+  to { opacity: 0; translate: 0 -24px; }
+}
+
+/* 3. Morph : la vignette devient la grande image (même objet qui voyage). */
+::view-transition-group(.morph) {
+  animation-duration: 560ms;
+  animation-timing-function: var(--courbe-out);
+  z-index: 50;
+}
+::view-transition-old(.morph),
+::view-transition-new(.morph) {
+  /* l'image remplit son cadre pendant le voyage, sans être déformée */
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+/* 4. Contenu qui arrive après un chargement : il monte (même courant). */
+::view-transition-old(.squelette-part) {
+  animation: 150ms var(--courbe-out) both page-sort;
+}
+::view-transition-new(.contenu-monte) {
+  animation: var(--vt-entree) var(--courbe-out) both page-entre;
+}
+
+/* 5. Les clics restent possibles pendant une transition. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* 6. « Moins d'animations » : changement instantané. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+/* ─────────────────────────────────────────────────────────────
+   MESSAGES DES FORMULAIRES (espace artiste, back-office…)
+   S'animent au moment où ils apparaissent (quand ils ne sont plus vides).
+   ───────────────────────────────────────────────────────────── */
+/* Confirmation (« Profil enregistré », etc.) : précédée d'une coche.
+   La 2e ligne « / "" » évite que les lecteurs d'écran lisent la coche. */
+p[role="status"]:not(:empty)::before {
+  content: "✓  ";
+  content: "✓  " / "";
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Confirmation : monte doucement en apparaissant. */
+  p[role="status"]:not(:empty) {
+    animation: message-ok 500ms var(--courbe-out) both;
+  }
+  /* Erreur : petit « non » de la tête (secousse horizontale). */
+  p[role="alert"]:not(:empty) {
+    animation: message-erreur 420ms var(--courbe-snap) both;
+  }
+}
+@keyframes message-ok {
+  from { opacity: 0; translate: 0 10px; }
+}
+@keyframes message-erreur {
+  0%, 100% { translate: 0; }
+  20% { translate: -6px; }
+  40% { translate: 5px; }
+  60% { translate: -3px; }
+  80% { translate: 2px; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CONTOUR LUMINEUX
+   Deux traits de lumière (or, blanc, ocre, terre) tournent en continu
+   autour de l'élément, avec un halo doré et un reflet qui traverse
+   l'élément de temps en temps.
+
+   S'applique AUTOMATIQUEMENT à tous les boutons du site
+   (balises <button> et liens en forme de pilule ou de bouton),
+   et aux éléments qui portent la classe « lumineux » (cartes de l'accueil…).
+   Pour l'enlever d'un élément précis : ajouter data-sans-lumiere.
+   ───────────────────────────────────────────────────────────── */
+
+/* --angle : variable « animable » (le navigateur sait la faire tourner). */
+@property --angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Les éléments concernés (on exclut ceux positionnés en « absolute »,
+   comme le bouton œil du mot de passe, pour ne pas les déplacer). */
+:is(
+    .lumineux,
+    button:not(:disabled),
+    a[class*="rounded-full"],
+    a[class*="rounded-[10px]"],
+    a[class*="rounded-xl"]
+  ):not(.absolute, .fixed, .sticky, [data-sans-lumiere]) {
+  position: relative;
+  isolation: isolate; /* les couches de lumière restent « dans » l'élément */
+}
+
+/* 1. Les traits lumineux : un dégradé circulaire qui tourne, dont on ne
+      garde qu'un anneau de 3 px (le « masque » efface tout l'intérieur). */
+:is(
+    .lumineux,
+    button:not(:disabled),
+    a[class*="rounded-full"],
+    a[class*="rounded-[10px]"],
+    a[class*="rounded-xl"]
+  ):not(.absolute, .fixed, .sticky, [data-sans-lumiere])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 2px; /* épaisseur du trait */
+  border-radius: inherit;
+    background: conic-gradient(
+    from var(--angle),
+    transparent 0% 55%,
+    var(--color-terre) 65%,
+    var(--color-ocre) 72%,
+    var(--color-or) 78%,
+    #fff6e0 81%,
+    var(--color-or) 84%,
+    transparent 92%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none; /* ne gêne jamais le clic */
+}
+
+/* 2. Le reflet : une bande de lumière en biais qui traverse l'élément. */
+:is(
+    .lumineux,
+    button:not(:disabled),
+    a[class*="rounded-full"],
+    a[class*="rounded-[10px]"],
+    a[class*="rounded-xl"]
+  ):not(.absolute, .fixed, .sticky, [data-sans-lumiere])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 42%, rgb(255 255 255 / 0.3) 50%, transparent 58%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(
+      .lumineux,
+      button:not(:disabled),
+      a[class*="rounded-full"],
+      a[class*="rounded-[10px]"],
+      a[class*="rounded-xl"]
+    ):not(.absolute, .fixed, .sticky, [data-sans-lumiere])::before {
+    animation: contour-tourne 3s linear infinite;
+  }
+  :is(
+      .lumineux,
+      button:not(:disabled),
+      a[class*="rounded-full"],
+      a[class*="rounded-[10px]"],
+      a[class*="rounded-xl"]
+    ):not(.absolute, .fixed, .sticky, [data-sans-lumiere])::after {
+    animation: reflet-passe 4.5s ease-in-out infinite;
+  }
+}
+@keyframes contour-tourne {
+  to { --angle: 360deg; }
+}
+@keyframes reflet-passe {
+  0%, 60% { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TREMBLEMENT FAÇON IPHONE
+   Toutes les cartes du site (artistes, œuvres, mosaïque du bandeau,
+   cartes de l'accueil) tremblent doucement en continu, comme les
+   applis en mode modification. Elles s'arrêtent quand on les survole
+   ou qu'on les touche (pour pouvoir cliquer tranquillement).
+   ───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  :is([data-carte], [data-tremble], [data-hero="tuile"]) {
+    animation: tremble 0.32s ease-in-out infinite alternate;
+  }
+  /* Chaque carte a un rythme un peu différent : plus naturel. */
+  :is([data-carte], [data-tremble], [data-hero="tuile"]):nth-child(2n),
+  li:nth-child(2n) > :is([data-carte], [data-tremble]) {
+    animation-duration: 0.36s;
+    animation-delay: -0.12s;
+  }
+  :is([data-carte], [data-tremble], [data-hero="tuile"]):nth-child(3n),
+  li:nth-child(3n) > :is([data-carte], [data-tremble]) {
+    animation-duration: 0.29s;
+    animation-delay: -0.2s;
+  }
+  :is([data-carte], [data-tremble], [data-hero="tuile"]):is(:hover, :focus-within, :active) {
+    animation-play-state: paused;
+  }
+}
+/* « rotate » et « translate » (et pas « transform ») : se combinent avec
+   les autres animations de la carte (inclinaison à la souris, apparition). */
+@keyframes tremble {
+  from { rotate: -1.2deg; translate: 0 -1px; }
+  to { rotate: 1.2deg; translate: 0 1px; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   VIDÉO D'OUVERTURE
+   ───────────────────────────────────────────────────────────── */
+/* Sécurité : si le JavaScript n'arrive pas, l'écran d'intro s'efface seul
+   au bout de 5 s (le JavaScript annule cette règle quand il prend la main). */
+.intro-voile {
+  animation: intro-secours 0.5s 5s forwards;
+}
+@keyframes intro-secours {
+  to { opacity: 0; visibility: hidden; }
+}
+/* Déjà vue pendant cette visite, ou « moins d'animations » : jamais affichée. */
+html[data-intro-vue] .intro-voile {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-voile {
+    display: none;
+  }
+}
+
+
+/* ═════════ MOTIFS D'ABOMEY (components/motifs) ═════════
+   Avant l'animation, les traits sont cachés (stroke-dashoffset: 1)
+   et les lignes des séparateurs repliées. Sécurité : si le JavaScript
+   ne se lance pas, tout s'affiche quand même au bout de 3 s. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-trace] path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: trace-secours 0s 3s forwards;
+  }
+  [data-separateur] [data-ligne] {
+    transform: scaleX(0);
+    animation: ligne-secours 0s 3s forwards;
+  }
+}
+@keyframes trace-secours { to { stroke-dashoffset: 0; } }
+@keyframes ligne-secours { to { transform: none; } }
+
+
+/* ═════════ GRAIN DE PAPIER (tout le site) ═════════
+   Une texture très fine posée sur toute la page, comme une affiche imprimée.
+   Le motif de bruit est dessiné par un petit SVG (feTurbulence), répété en tuiles.
+   pointer-events: none → elle ne gêne jamais les clics. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 90; /* au-dessus des pages, sous la vidéo d'ouverture (z-100) */
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 200px;
+}
+
+
+/* ═════════ CURSEUR PERSONNALISÉ (components/motion/curseur.tsx) ═════════ */
+/* La flèche du système est cachée seulement quand le curseur maison est actif,
+   sauf dans les champs de texte (on garde la barre de saisie) et quand une
+   fenêtre (ex. la visionneuse photo) est ouverte : elle passe au-dessus de tout. */
+html[data-curseur-actif]:not(:has(dialog[open])),
+html[data-curseur-actif]:not(:has(dialog[open])) * {
+  cursor: none !important;
+}
+html[data-curseur-actif] :is(input, textarea, [contenteditable="true"]) {
+  cursor: text !important;
+}
+html:has(dialog[open]) .curseur {
+  display: none;
+}
+
+/* Point et anneau : centrés sur la souris (translate -50 %), au-dessus de tout,
+   et ils ne bloquent jamais les clics (pointer-events: none). */
+.curseur-point,
+.curseur-anneau {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 150;
+  pointer-events: none;
+  visibility: hidden; /* rendu visible par GSAP au premier mouvement */
+  opacity: 0;
+  translate: -50% -50%;
+  border-radius: 999px;
+  mix-blend-mode: difference; /* blanc sur fond foncé, presque noir sur fond clair */
+}
+.curseur-point {
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  transition: width 0.25s, height 0.25s;
+}
+.curseur-anneau {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid #fff;
+  transition:
+    width 0.35s var(--courbe-out),
+    height 0.35s var(--courbe-out),
+    background-color 0.3s,
+    border-color 0.3s;
+}
+.curseur-anneau span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-sable);
+  opacity: 0;
+  scale: 0.6;
+  transition: opacity 0.2s, scale 0.35s var(--courbe-out);
+}
+
+/* Sur un lien ou un bouton : l'anneau grossit, le point disparaît. */
+.curseur-anneau[data-etat="lien"] {
+  width: 58px;
+  height: 58px;
+}
+.curseur-point[data-etat="lien"] {
+  width: 0;
+  height: 0;
+}
+
+/* Sur une carte : pastille pleine aux couleurs du site avec « Voir ». */
+.curseur-anneau[data-etat="voir"] {
+  width: 84px;
+  height: 84px;
+  mix-blend-mode: normal;
+  background-color: var(--color-terre);
+  border-color: var(--color-terre);
+}
+.curseur-anneau[data-etat="voir"] span {
+  opacity: 1;
+  scale: 1;
+}
+.curseur-point[data-etat="voir"] {
+  width: 0;
+  height: 0;
+}
+
+/* Dans un champ de texte : le curseur maison s'efface. */
+.curseur-anneau[data-etat="texte"],
+.curseur-point[data-etat="texte"] {
+  width: 0;
+  height: 0;
+  border-width: 0;
+}
